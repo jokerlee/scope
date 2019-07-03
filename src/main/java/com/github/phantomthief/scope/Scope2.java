@@ -9,13 +9,11 @@ import javax.annotation.Nullable;
 import com.github.phantomthief.util.ThrowableRunnable;
 import com.github.phantomthief.util.ThrowableSupplier;
 
-import io.netty.util.concurrent.FastThreadLocal;
-
 /**
  * 自定义Scope，支持如下功能：
  *
  * <ul>
- *  <li>开启一个自定义的Scope，在Scope范围内，可以通过 {@link Scope} 各个方法读写数据</li>
+ *  <li>开启一个自定义的Scope，在Scope范围内，可以通过 {@link Scope2} 各个方法读写数据</li>
  *  <li>可以通过 {@link #supplyWithExistScope} 或者 {@link #runWithExistScope} 绑定已经存在的scope</li>
  * </ul>
  *
@@ -44,13 +42,13 @@ import io.netty.util.concurrent.FastThreadLocal;
  *
  * @author w.vela
  */
-public final class Scope {
+public final class Scope2 {
 
-    private static final FastThreadLocal<Scope> SCOPE_THREAD_LOCAL = new FastThreadLocal<>();
+    private static final ThreadLocal<Scope2> SCOPE_THREAD_LOCAL = new ThreadLocal<>();
 
-    private final ConcurrentMap<ScopeKey<?>, Object> values = new ConcurrentHashMap<>();
+    private final ConcurrentMap<ScopeKey2<?>, Object> values = new ConcurrentHashMap<>();
 
-    public static <X extends Throwable> void runWithExistScope(@Nullable Scope scope,
+    public static <X extends Throwable> void runWithExistScope(@Nullable Scope2 scope,
             ThrowableRunnable<X> runnable) throws X {
         supplyWithExistScope(scope, () -> {
             runnable.run();
@@ -58,9 +56,9 @@ public final class Scope {
         });
     }
 
-    public static <T, X extends Throwable> T supplyWithExistScope(@Nullable Scope scope,
+    public static <T, X extends Throwable> T supplyWithExistScope(@Nullable Scope2 scope,
             ThrowableSupplier<T, X> supplier) throws X {
-        Scope oldScope = SCOPE_THREAD_LOCAL.get();
+        Scope2 oldScope = SCOPE_THREAD_LOCAL.get();
         SCOPE_THREAD_LOCAL.set(scope);
         try {
             return supplier.get();
@@ -103,12 +101,12 @@ public final class Scope {
      * @throws IllegalStateException if try to start a new scope in an exist scope.
      */
     @Nonnull
-    public static Scope beginScope() {
-        Scope scope = SCOPE_THREAD_LOCAL.get();
+    public static Scope2 beginScope() {
+        Scope2 scope = SCOPE_THREAD_LOCAL.get();
         if (scope != null) {
             throw new IllegalStateException("start a scope in an exist scope.");
         }
-        scope = new Scope();
+        scope = new Scope2();
         SCOPE_THREAD_LOCAL.set(scope);
         return scope;
     }
@@ -121,11 +119,11 @@ public final class Scope {
     }
 
     @Nullable
-    public static Scope getCurrentScope() {
+    public static Scope2 getCurrentScope() {
         return SCOPE_THREAD_LOCAL.get();
     }
 
-    public <T> void set(@Nonnull ScopeKey<T> key, T value) {
+    public <T> void set(@Nonnull ScopeKey2<T> key, T value) {
         if (value != null) {
             values.put(key, value);
         } else {
@@ -134,7 +132,7 @@ public final class Scope {
     }
 
     @SuppressWarnings("unchecked")
-    public <T> T get(@Nonnull ScopeKey<T> key) {
+    public <T> T get(@Nonnull ScopeKey2<T> key) {
         T value = (T) values.get(key);
         if (value == null && key.initializer() != null) {
             // 这里不使用computeIfAbsent保证原子性，是因为computeIfAbsent会有几率造成同桶冲撞
